@@ -93,7 +93,7 @@
             <div class="bg-slate-900 rounded-xl border border-slate-800 h-64 flex flex-col shrink-0">
                 <div class="border-b border-slate-800 px-5 py-3 flex justify-between items-center bg-slate-900/50">
                     <h2 class="text-xs font-bold text-blue-400 uppercase tracking-wider">
-                        <i class="fa-solid fa-microchip mr-2"></i>AlloyDB AI Insights
+                        <i class="fa-solid fa-microchip mr-2"></i>Safety Alerts
                     </h2>
                 </div>
                 <div id="log-container" class="flex-1 overflow-y-auto p-4 font-mono text-sm flex flex-col gap-3">
@@ -160,7 +160,7 @@
             const time = new Date().toLocaleTimeString('en-US', { hour12: false });
             const div = document.createElement('div');
             let color = type === 'alert' ? 'text-red-400 font-bold bg-red-950/30 p-2 rounded border border-red-900/50' : 'text-slate-300';
-            let prefix = type === 'alert' ? '[GEMMA INSIGHT]' : '[INFO]';
+            let prefix = type === 'alert' ? '[SAFETY ALERT]' : '[INFO]';
             
             div.innerHTML = `<span class="text-slate-600 mr-2">${time}</span> <span class="${color}">${prefix} ${message}</span>`;
             logContainer.appendChild(div);
@@ -180,17 +180,17 @@
             try {
                 const res = await fetch('/api/stream');
                 const data = await res.json();
-                
-                // Update UI Values
+
+                // Update UI values
                 valPressure.innerText = data.pressure.toFixed(1);
                 valVib.innerText = data.vibration.toFixed(2);
-                
-                // Update Chart
+
+                // Update chart
                 chart.data.datasets[0].data.push(data.pressure);
                 chart.data.datasets[0].data.shift();
                 chart.data.datasets[1].data.push(data.vibration);
                 chart.data.datasets[1].data.shift();
-                chart.update();
+                chart.update('none');
 
                 // Style handling for anomalies
                 if (data.pressure < 260 || data.vibration > 4.5) {
@@ -201,14 +201,30 @@
                     cardVib.classList.remove('glow-red');
                 }
 
-                // AI Insight Handling
-                if (data.insight && data.insight !== lastInsight) {
-                    lastInsight = data.insight;
-                    addLog(data.insight, 'alert');
+                // Log only when severity changes
+                const currentSeverity =
+                    data.pressure < 240 || data.vibration > 10
+                        ? 'CRITICAL'
+                        : (data.pressure < 260 || data.vibration > 4.5
+                            ? 'WARNING'
+                            : 'NORMAL');
+
+                if (currentSeverity !== lastInsight) {
+                    if (currentSeverity === 'NORMAL') {
+                        if (lastInsight !== null) {
+                            addLog('Machine readings have returned to normal. Recovery confirmed.', 'success');
+                        }
+                    } else {
+                        addLog(
+                            `${currentSeverity}: Pressure ${data.pressure.toFixed(1)} bar | Vibration ${data.vibration.toFixed(2)} mm/s`,
+                            'alert'
+                        );
+                    }
+                    lastInsight = currentSeverity;
                 }
 
             } catch (e) {
-                console.error("Backend connection lost");
+                console.error("Backend connection lost", e);
             }
         }
 
